@@ -350,17 +350,34 @@ ext(ext(Type, Data)) -->
 ext(ext(Type, Data)) -->
     [0xd8, Type|Data],
     { length(Data, 16) }.
+ext(ext(Type, Data)) -->
+    [0xc7, Len, Type|Data],
+    { Len in 0..255,
+      length(Data, Len) }.
+ext(ext(Type, Data)) -->
+    [0xc8, A, B, Type|Data],
+    { Len #< 1<<17,
+      [A,B] ins 0..255,
+      Len #= A<<8 + B,
+      length(Data, Len) }.
+ext(ext(Type, Data)) -->
+    [0xc9, A, B, C, D, Type|Data],
+    { Len #< 1<<33,
+      [A,B,C,D] ins 0..255,
+      Len #= A<<24 + B<<16 + C<<8 + D,
+      length(Data, Len) }.
 
 msgpack(none) --> nil, !.
 msgpack(str(S)) --> str(str(S)), !.
 msgpack(list(L)) --> array(list(L)), !.
 msgpack(dict(D)) --> map(dict(D)), !.
 msgpack(bin(X)) --> bin(bin(X)), !.
+msgpack(ext(T, X)) --> ext(ext(T, X)), !.
+%% msgpack(float(N)) --> float(float(N)), !.
 msgpack(B) --> bool(B), !.
 % TODO: should integers be wrapped in some way?
 % should different-sized numbers be wrapped? e.g. int8(N), uint16(N)?
 msgpack(N) --> int(N), !.
-%% msgpack(float(N)) --> float(float(N)), !.
 
 :- use_module(library(plunit)).
 ?- load_test_files([]), run_tests.
