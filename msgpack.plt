@@ -141,4 +141,8 @@ test(ext1) :- msgpack(ext(28, [0xab]), [0xd4, 28, 0xab], []).
 test(ext2) :- msgpack(ext(37, [0xab, 0xbc]), [0xd5, 37, 0xab, 0xbc], []).
 test(ext3) :- msgpack(ext(42, [0xab, 0xbc]), [0xc7, 2, 42, 0xab, 0xbc], []).
 
+test(timestamp) :- msgpack(date(2021, 1, 14, 9, 43, 16.0, 0, 'UTC', -),
+                           [0xd6, 0xff, 0x60, 0x00, 0x12, 0x34],
+                           []).
+
 :- end_tests(msgpack).

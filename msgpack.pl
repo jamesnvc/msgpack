@@ -337,41 +337,71 @@ map(dict(D)) -->
       H #= 0b10000000 + L,
       consume_msgpack_dict(D, T, L) }.
 
-% NB. Type is supposed to be signed, with <0 reserved
 ext(ext(Type, [Data])) -->
+    { Type in 0..0x7f },
     [0xd4, Type, Data].
 ext(ext(Type, [A,B])) -->
+    { Type in 0..0x7f },
     [0xd5, Type, A, B].
 ext(ext(Type, [A,B,C,D])) -->
+    { Type in 0..0x7f },
     [0xd6, Type, A, B, C, D].
 ext(ext(Type, Data)) -->
+    { Type in 0..0x7f },
     [0xd7, Type|Data],
     { length(Data, 8) }.
 ext(ext(Type, Data)) -->
+    { Type in 0..0x7f },
     [0xd8, Type|Data],
     { length(Data, 16) }.
 ext(ext(Type, Data)) -->
+    { Type in 0..0x7f },
     [0xc7, Len, Type|Data],
     { Len in 0..255,
       length(Data, Len) }.
 ext(ext(Type, Data)) -->
+    { Type in 0..0x7f },
     [0xc8, A, B, Type|Data],
     { Len #< 1<<17,
       [A,B] ins 0..255,
       Len #= A<<8 + B,
       length(Data, Len) }.
 ext(ext(Type, Data)) -->
+    { Type in 0..0x7f },
     [0xc9, A, B, C, D, Type|Data],
     { Len #< 1<<33,
       [A,B,C,D] ins 0..255,
       Len #= A<<24 + B<<16 + C<<8 + D,
       length(Data, Len) }.
 
+% timestamp32 stores number of seconds since 1970-01-01 00:00:00 UTC as uint32
+timestamp(dt(Dt)) -->
+    { ground(Dt) },
+    [0xd6, 0xff, A, B, C, D],
+    { date_time_stamp(Dt, Tss),
+      Ts is truncate(Tss),
+      A is (Ts /\ 0xff00_0000) >> 24,
+      B is (Ts /\ 0x00ff_0000) >> 16,
+      C is (Ts /\ 0x0000_ff00) >> 8,
+      D is (Ts /\ 0x0000_00ff) >> 0 }.
+timestamp(dt(T)) -->
+    [0xd6, 0xff, A, B, C, D],
+    { Ts #= A<<24 + B<<16 + C<<8 + D,
+      stamp_date_time(Ts, T, 'UTC') }.
+% timestamp 64 stores the number of seconds and nanoseconds that have
+% elapsed since epoch; nanosecond in a 30-bit unsigned int and seconds
+% in a 34-bit unsigned int
+% timestamp 96 stores the number of seconds and nanoseconds since
+% epoch; nanoseconds in a 32-bit unsigned int and seconds in a 64-bit
+% signed int
+
 msgpack(none) --> nil, !.
 msgpack(str(S)) --> str(str(S)), !.
 msgpack(list(L)) --> array(list(L)), !.
 msgpack(dict(D)) --> map(dict(D)), !.
 msgpack(bin(X)) --> bin(bin(X)), !.
+msgpack(date(Y,M,D,H,Mn,S,Off,TZ,DST)) -->
+    { Dt = date(Y,M,D,H,Mn,S,Off,TZ,DST) }, timestamp(dt(Dt)), !.
 msgpack(ext(T, X)) --> ext(ext(T, X)), !.
 %% msgpack(float(N)) --> float(float(N)), !.
 msgpack(B) --> bool(B), !.
