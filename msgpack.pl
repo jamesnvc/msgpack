@@ -7,7 +7,8 @@ This module contains DCGs for packing & unpacking MessagePack data.
 @license GPLv3
 
 @tbd double-precision floats
-@see https://github.com/msgpack/msgpack/blob/master/spec.md
+
+@bug Can't write out floats (can unpack single-precision, but not write)
 */
 :- use_module(library(clpfd)).
 

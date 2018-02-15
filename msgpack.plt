@@ -153,5 +153,12 @@ test(float_single) :-
     msgpack(single(0.15625),
             [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000],
             []).
+% currently failing b/c packing floats seems like a huge pain in the ass
+%% test(pack_float_single) :-
+%%     msgpack(single(0.15625), X, []),
+%%     !, X = [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000].
+test(unpack_float_single) :-
+    msgpack(X, [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000], []),
+    !, X = single(0.15625).
 
 :- end_tests(msgpack).
