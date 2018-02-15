@@ -12,8 +12,8 @@ This module contains DCGs for packing & unpacking MessagePack data.
 :- use_module(library(clpfd)).
 
 
-%! msgpack(+MsgPack, -Bytes, ?_) is det.
-%! msgpack(-MsgPack, +Bytes, ?_) is det.
+%! msgpack(+MsgPack, -Bytes, ?_) is semidet.
+%! msgpack(-MsgPack, +Bytes, ?_) is semidet.
 % DCG for packing/unpacking MessagePack to/from a list of bytes.
 msgpack(none) --> nil, !.
 msgpack(str(S)) --> str(str(S)), !.
