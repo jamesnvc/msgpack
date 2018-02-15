@@ -5,11 +5,16 @@ This module contains DCGs for packing & unpacking MessagePack data.
 
 @author James Cash
 @license GPLv3
+
+@tbd double-precision floats
+@see https://github.com/msgpack/msgpack/blob/master/spec.md
 */
 :- use_module(library(clpfd)).
 
-% See https://github.com/msgpack/msgpack/blob/master/spec.md
 
+%! msgpack(+MsgPack, -Bytes, ?_) is det.
+%! msgpack(-MsgPack, +Bytes, ?_) is det.
+% DCG for packing/unpacking MessagePack to/from a list of bytes.
 msgpack(none) --> nil, !.
 msgpack(str(S)) --> str(str(S)), !.
 msgpack(list(L)) --> array(list(L)), !.
@@ -19,7 +24,6 @@ msgpack(date(Y,M,D,H,Mn,S,Off,TZ,DST)) -->
     { Dt = date(Y,M,D,H,Mn,S,Off,TZ,DST) }, timestamp(dt(Dt)), !.
 msgpack(ext(T, X)) --> ext(ext(T, X)), !.
 msgpack(single(N)) --> floating(single(N)), !.
-% TODO: double floats
 msgpack(B) --> bool(B), !.
 msgpack(N) --> int(N), !.
 
@@ -203,7 +207,7 @@ int64(N) --> % pos int64
       N in 0..(0x7fff_ffff_ffff_ffff),
       N #= A<<56 + B<<48 + C<<40 + D<<32 + E<<24 + F<<16 + G<<8 + H }.
 
-%% Floats
+% Floats
 % TODO: use clp(r) for this?
 float_bits(_,  N, -1,  _,   N) :- !.
 float_bits(Bs, N, Bit, Div, Ans) :-
@@ -227,7 +231,7 @@ floating(single(Fl)) -->
 %%     [0xcb, A, B, C, D, E, F, G, H],
 %%     { [A,B,C,D,E,F,G,H] ins 0..255 }.
 
-%% Strings
+% Strings
 
 % string helper predicates
 str_header(N, 0xd9) :- N < 1<<8.
@@ -292,7 +296,7 @@ bin(bin(Data)) -->
     { Len #= A<<24 + B<<16 + C<<8 + D,
       length(Data, Len) }.
 
-%% Arrays
+% Arrays
 
 % Array helper predicates
 consume_msgpack_list([], [], 0) :- !.
@@ -341,7 +345,7 @@ array(list(List)) -->
     { Len is A <<24 + B<<16 + C<<8 + D,
       consume_msgpack_list(List, T, Len) }.
 
-%% Maps
+% Maps
 % Need to use pairs insead of dicts, because dicts only support atom
 % or integer keys
 
@@ -456,5 +460,5 @@ unsigned64_signed64(Un, Si) :-
     Si is -Inv - 1.
 unsigned64_signed64(Un, Un).
 
-%% :- use_module(library(plunit)).
-%% ?- load_test_files([]), run_tests.
+% :- use_module(library(plunit)).
+% ?- load_test_files([]), run_tests.
