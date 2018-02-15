@@ -10,31 +10,34 @@ This module contains DCGs for packing & unpacking MessagePack data.
 
 % See https://github.com/msgpack/msgpack/blob/master/spec.md
 
-% helper predicates
-int_bytes(0, R, R).
-int_bytes(I, Bs, R) :-
-    Bl is I /\ 0xff,
-    In is I >> 8,
-    int_bytes(In, [Bl|Bs], R).
-
-int_bytes(I, B) :- int_bytes(I, [], B).
-
-pad_bytes([B], [B]).
-pad_bytes([B1, B2], [B1, B2]).
-pad_bytes([B1, B2, B3], [0, B1, B2, B3]).
-pad_bytes([B1, B2, B3, B4], [B1, B2, B3, B4]).
-
-unsigned64_signed64(Un, Si) :-
-    Un >= 0b1000_0000_0000_0000,
-    Inv is 0xffff_ffff_ffff_ffff - Un,
-    Si is -Inv - 1.
-unsigned64_signed64(Un, Un).
-%% DCGs
+msgpack(none) --> nil, !.
+msgpack(str(S)) --> str(str(S)), !.
+msgpack(list(L)) --> array(list(L)), !.
+msgpack(dict(D)) --> map(dict(D)), !.
+msgpack(bin(X)) --> bin(bin(X)), !.
+msgpack(date(Y,M,D,H,Mn,S,Off,TZ,DST)) -->
+    { Dt = date(Y,M,D,H,Mn,S,Off,TZ,DST) }, timestamp(dt(Dt)), !.
+msgpack(ext(T, X)) --> ext(ext(T, X)), !.
+msgpack(single(N)) --> floating(single(N)), !.
+% TODO: double floats
+msgpack(B) --> bool(B), !.
+msgpack(N) --> int(N), !.
 
 nil --> [0xc0].
 
 bool(false)--> [0xc2].
 bool(true) --> [0xc3].
+
+%% Integer types
+int(N) --> fixnum(N).
+int(N) --> uint8(N).
+int(N) --> uint16(N).
+int(N) --> uint32(N).
+int(N) --> uint64(N).
+int(N) --> int8(N).
+int(N) --> int16(N).
+int(N) --> int32(N).
+int(N) --> int64(N).
 
 % positive fixnum stores 7-bit positive integer
 fixnum(N) -->
@@ -200,16 +203,7 @@ int64(N) --> % pos int64
       N in 0..(0x7fff_ffff_ffff_ffff),
       N #= A<<56 + B<<48 + C<<40 + D<<32 + E<<24 + F<<16 + G<<8 + H }.
 
-int(N) --> fixnum(N).
-int(N) --> uint8(N).
-int(N) --> uint16(N).
-int(N) --> uint32(N).
-int(N) --> uint64(N).
-int(N) --> int8(N).
-int(N) --> int16(N).
-int(N) --> int32(N).
-int(N) --> int64(N).
-
+%% Floats
 % TODO: use clp(r) for this?
 float_bits(_,  N, -1,  _,   N) :- !.
 float_bits(Bs, N, Bit, Div, Ans) :-
@@ -233,9 +227,17 @@ floating(single(Fl)) -->
 %%     [0xcb, A, B, C, D, E, F, G, H],
 %%     { [A,B,C,D,E,F,G,H] ins 0..255 }.
 
+%% Strings
+
+% string helper predicates
 str_header(N, 0xd9) :- N < 1<<8.
 str_header(N, 0xda) :- N < 1<<16.
 str_header(N, 0xdb) :- N < 1<<32.
+
+string_pad_bytes([B], [B]).
+string_pad_bytes([B1, B2], [B1, B2]).
+string_pad_bytes([B1, B2, B3], [0, B1, B2, B3]).
+string_pad_bytes([B1, B2, B3, B4], [B1, B2, B3, B4]).
 
 str(str(S)) -->
     { string(S), string_length(S, L), L =< 31, ! },
@@ -277,6 +279,7 @@ str(str(S)) -->
       L is A<<24 + B<<16 + C<<8 + D,
       string_codes(S, Bytes) }.
 
+%% Bins i.e. byte arrays
 bin(bin(Data)) -->
     [0xc4, Len|Data],
     { length(Data, Len) }.
@@ -288,6 +291,8 @@ bin(bin(Data)) -->
     [0xc6, A, B, C, D|Data],
     { Len #= A<<24 + B<<16 + C<<8 + D,
       length(Data, Len) }.
+
+%% Arrays
 
 % Array helper predicates
 consume_msgpack_list([], [], 0) :- !.
@@ -336,8 +341,11 @@ array(list(List)) -->
     { Len is A <<24 + B<<16 + C<<8 + D,
       consume_msgpack_list(List, T, Len) }.
 
+%% Maps
 % Need to use pairs insead of dicts, because dicts only support atom
 % or integer keys
+
+% map helper predicates
 consume_msgpack_dict([], [], 0) :- !.
 consume_msgpack_dict([K-V|KVs], Bs, N) :-
     msgpack(K, Bs, Rst_),
@@ -356,6 +364,8 @@ map(dict(D)) -->
     { H in 0b10000000..0b10001111,
       H #= 0b10000000 + L,
       consume_msgpack_dict(D, T, L) }.
+
+%% Extension types
 
 ext(ext(Type, [Data])) -->
     { Type in 0..0x7f },
@@ -394,6 +404,7 @@ ext(ext(Type, Data)) -->
       Len #= A<<24 + B<<16 + C<<8 + D,
       length(Data, Len) }.
 
+%% Timestamp extensions
 % timestamp32 stores number of seconds since 1970-01-01 00:00:00 UTC as uint32
 timestamp(dt(Dt)) -->
     { ground(Dt) },
@@ -431,17 +442,19 @@ timestamp(dt(T)) -->
       Time is Ts + (Tn / 1e9),
       stamp_date_time(Time, T, 'UTC') }.
 
-msgpack(none) --> nil, !.
-msgpack(str(S)) --> str(str(S)), !.
-msgpack(list(L)) --> array(list(L)), !.
-msgpack(dict(D)) --> map(dict(D)), !.
-msgpack(bin(X)) --> bin(bin(X)), !.
-msgpack(date(Y,M,D,H,Mn,S,Off,TZ,DST)) -->
-    { Dt = date(Y,M,D,H,Mn,S,Off,TZ,DST) }, timestamp(dt(Dt)), !.
-msgpack(ext(T, X)) --> ext(ext(T, X)), !.
-msgpack(single(N)) --> floating(single(N)), !.
-msgpack(B) --> bool(B), !.
-msgpack(N) --> int(N), !.
+% helper predicates
+int_bytes(I, B) :- int_bytes(I, [], B).
+int_bytes(0, R, R).
+int_bytes(I, Bs, R) :-
+    Bl is I /\ 0xff,
+    In is I >> 8,
+    int_bytes(In, [Bl|Bs], R).
+
+unsigned64_signed64(Un, Si) :-
+    Un >= 0b1000_0000_0000_0000,
+    Inv is 0xffff_ffff_ffff_ffff - Un,
+    Si is -Inv - 1.
+unsigned64_signed64(Un, Un).
 
 :- use_module(library(plunit)).
 ?- load_test_files([]), run_tests.
