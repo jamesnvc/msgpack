@@ -456,5 +456,5 @@ unsigned64_signed64(Un, Si) :-
     Si is -Inv - 1.
 unsigned64_signed64(Un, Un).
 
-:- use_module(library(plunit)).
-?- load_test_files([]), run_tests.
+%% :- use_module(library(plunit)).
+%% ?- load_test_files([]), run_tests.
