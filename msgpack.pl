@@ -15,6 +15,8 @@ This module contains DCGs for packing & unpacking MessagePack data.
 %! msgpack(+MsgPack, -Bytes, ?_) is semidet.
 %! msgpack(-MsgPack, +Bytes, ?_) is semidet.
 % DCG for packing/unpacking MessagePack to/from a list of bytes.
+%
+% @see https://github.com/msgpack/msgpack/blob/master/spec.md
 msgpack(none) --> nil, !.
 msgpack(str(S)) --> str(str(S)), !.
 msgpack(list(L)) --> array(list(L)), !.
@@ -32,7 +34,7 @@ nil --> [0xc0].
 bool(false)--> [0xc2].
 bool(true) --> [0xc3].
 
-%% Integer types
+% Integer types
 int(N) --> fixnum(N).
 int(N) --> uint8(N).
 int(N) --> uint16(N).
@@ -226,10 +228,10 @@ floating(single(Fl)) -->
       FracBits is (B /\ 0b0111_1111)<<16 + C<<8 + D,
       float_bits(FracBits, Frac),
       Fl is Sign * Exp * Frac }.
-%% TODO: gurf
-%% float(double(N)) -->
-%%     [0xcb, A, B, C, D, E, F, G, H],
-%%     { [A,B,C,D,E,F,G,H] ins 0..255 }.
+% TODO: gurf
+% float(double(N)) -->
+%     [0xcb, A, B, C, D, E, F, G, H],
+%     { [A,B,C,D,E,F,G,H] ins 0..255 }.
 
 % Strings
 
@@ -283,7 +285,7 @@ str(str(S)) -->
       L is A<<24 + B<<16 + C<<8 + D,
       string_codes(S, Bytes) }.
 
-%% Bins i.e. byte arrays
+% Bins i.e. byte arrays
 bin(bin(Data)) -->
     [0xc4, Len|Data],
     { length(Data, Len) }.
@@ -369,7 +371,7 @@ map(dict(D)) -->
       H #= 0b10000000 + L,
       consume_msgpack_dict(D, T, L) }.
 
-%% Extension types
+% Extension types
 
 ext(ext(Type, [Data])) -->
     { Type in 0..0x7f },
@@ -408,7 +410,7 @@ ext(ext(Type, Data)) -->
       Len #= A<<24 + B<<16 + C<<8 + D,
       length(Data, Len) }.
 
-%% Timestamp extensions
+% Timestamp extensions
 % timestamp32 stores number of seconds since 1970-01-01 00:00:00 UTC as uint32
 timestamp(dt(Dt)) -->
     { ground(Dt) },
