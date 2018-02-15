@@ -24,6 +24,11 @@ pad_bytes([B1, B2], [B1, B2]).
 pad_bytes([B1, B2, B3], [0, B1, B2, B3]).
 pad_bytes([B1, B2, B3, B4], [B1, B2, B3, B4]).
 
+unsigned64_signed64(Un, Si) :-
+    Un >= 0b1000_0000_0000_0000,
+    Inv is 0xffff_ffff_ffff_ffff - Un,
+    Si is -Inv - 1.
+unsigned64_signed64(Un, Un).
 %% DCGs
 
 nil --> [0xc0].
@@ -205,10 +210,25 @@ int(N) --> int16(N).
 int(N) --> int32(N).
 int(N) --> int64(N).
 
-%%% TODO: floats & doubles in Prolog seems painful
-%% float(float(N)) -->
-%%     [0xca, A, B, C, D],
-%%     { [A,B,C,D] ins 0..255 }.
+% TODO: use clp(r) for this?
+float_bits(_,  N, -1,  _,   N) :- !.
+float_bits(Bs, N, Bit, Div, Ans) :-
+    Nn is N + (getbit(Bs, Bit) * Div),
+    DivN is Div / 2,
+    BitN is Bit - 1,
+    float_bits(Bs, Nn, BitN, DivN, Ans).
+float_bits(Bs, N) :- float_bits(Bs, 1, 22, 0.5, N).
+
+floating(single(Fl)) -->
+    [0xca, A, B, C, D],
+    { [A,B,C,D] ins 0..255,
+      Sign is (-1)**((A /\ 0b1000_0000) >> 7),
+      Exp_ is (A /\ 0b0111_1111) << 1 + (B /\ 0b1000_0000) >> 7,
+      Exp is 2**(Exp_ - 127),
+      FracBits is (B /\ 0b0111_1111)<<16 + C<<8 + D,
+      float_bits(FracBits, Frac),
+      Fl is Sign * Exp * Frac }.
+%% TODO: gurf
 %% float(double(N)) -->
 %%     [0xcb, A, B, C, D, E, F, G, H],
 %%     { [A,B,C,D,E,F,G,H] ins 0..255 }.
@@ -391,9 +411,25 @@ timestamp(dt(T)) -->
 % timestamp 64 stores the number of seconds and nanoseconds that have
 % elapsed since epoch; nanosecond in a 30-bit unsigned int and seconds
 % in a 34-bit unsigned int
+timestamp(dt(T)) -->
+    % Can't use clp(fd) here, since we need to use floats...
+    [0xd7, 0xff, A, B, C, D, E, F, G, H],
+    { Tsn is float(A<<22 + B<<14 + C<<6 + (D /\ 0b1111_1100)>>6),
+      Tss is (D /\ 0b011) << 32 + E<<24 + F<<16 + G<<8 + H,
+      Tsn < 1e9,
+      Ts is Tss + (Tsn / 1e9),
+      stamp_date_time(Ts, T, 'UTC') }.
 % timestamp 96 stores the number of seconds and nanoseconds since
 % epoch; nanoseconds in a 32-bit unsigned int and seconds in a 64-bit
 % signed int
+timestamp(dt(T)) -->
+    [0xc7, 12, 0xff, Na, Nb, Nc, Nd, Sa, Sb, Sc, Sd, Se, Sf, Sg, Sh],
+    { Tn is float(Na<<24 + Nb<<16 + Nc<<8 + Nd),
+      Ts_ is Sa<<56 + Sb<<48 + Sc<<40 +Sd<<32 + Se<<24 + Sf<<16 + Sg<<8 + Sh,
+      unsigned64_signed64(Ts_, Ts),
+      Tn < 1e9,
+      Time is Ts + (Tn / 1e9),
+      stamp_date_time(Time, T, 'UTC') }.
 
 msgpack(none) --> nil, !.
 msgpack(str(S)) --> str(str(S)), !.
@@ -403,10 +439,8 @@ msgpack(bin(X)) --> bin(bin(X)), !.
 msgpack(date(Y,M,D,H,Mn,S,Off,TZ,DST)) -->
     { Dt = date(Y,M,D,H,Mn,S,Off,TZ,DST) }, timestamp(dt(Dt)), !.
 msgpack(ext(T, X)) --> ext(ext(T, X)), !.
-%% msgpack(float(N)) --> float(float(N)), !.
+msgpack(single(N)) --> floating(single(N)), !.
 msgpack(B) --> bool(B), !.
-% TODO: should integers be wrapped in some way?
-% should different-sized numbers be wrapped? e.g. int8(N), uint16(N)?
 msgpack(N) --> int(N), !.
 
 :- use_module(library(plunit)).

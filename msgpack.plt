@@ -19,39 +19,40 @@ test(uint64) :- msgpack(0xabcdef98abcdef98,
                         []).
 
 
-test(unpack_fixnum_pos) :- msgpack(X, [14], []), X = 14.
-test(unpack_fixnum_neg) :- msgpack(X, [238], []), X = -18.
-test(unpack_uint8) :- msgpack(X, [0xcc, 0xfa], []), X = 0xfa.
-test(unpack_uint16) :- msgpack(X, [0xcd, 0x1b, 0xcd], []), X = 0x1bcd.
+test(unpack_fixnum_pos) :- msgpack(X, [14], []), !, X = 14.
+test(unpack_fixnum_neg) :- msgpack(X, [238], []), !, X = -18.
+test(unpack_uint8) :- msgpack(X, [0xcc, 0xfa], []), !, X = 0xfa.
+test(unpack_uint16) :- msgpack(X, [0xcd, 0x1b, 0xcd], []), !, X = 0x1bcd.
 test(unpack_uint32) :- msgpack(X, [0xce, 0xab, 0xcd, 0xef, 0x98], []),
+                       !,
                        X = 0xabcdef98.
 test(unpack_uint64) :-
     msgpack(X, [0xcf, 0xa8, 0x23, 0xfa, 0x84, 0xac, 0xde, 0x10, 0x17], []),
-    X = 0xa823fa84acde1017.
+    !, X = 0xa823fa84acde1017.
 
-test(pack_fixnum_pos) :- msgpack(14, X, []), X = [14].
-test(pack_fixnum_neg) :- msgpack(-18, X, []), X = [238].
-test(pack_uint8) :- msgpack(0xfa, X, []), X = [0xcc, 0xfa].
-test(pack_uint16) :- msgpack(0x1bcd, X, []), X = [0xcd, 0x1b, 0xcd].
+test(pack_fixnum_pos) :- msgpack(14, X, []), !, X = [14].
+test(pack_fixnum_neg) :- msgpack(-18, X, []), !, X = [238].
+test(pack_uint8) :- msgpack(0xfa, X, []), !, X = [0xcc, 0xfa].
+test(pack_uint16) :- msgpack(0x1bcd, X, []), !, X = [0xcd, 0x1b, 0xcd].
 test(pack_uint32) :- msgpack(0xabcdef98, X, []),
-                     X = [0xce, 0xab, 0xcd, 0xef, 0x98].
+                     !, X = [0xce, 0xab, 0xcd, 0xef, 0x98].
 test(pack_uint64) :-
     msgpack(0xa823fa84acde1017, X, []),
-    X = [0xcf, 0xa8, 0x23, 0xfa, 0x84, 0xac, 0xde, 0x10, 0x17].
+    !, X = [0xcf, 0xa8, 0x23, 0xfa, 0x84, 0xac, 0xde, 0x10, 0x17].
 
 test(neg_int8) :- msgpack(-56, [0xd0, 0b11001000], []).
-test(unpack_int8) :- msgpack(X, [0xd0, 0b10011010], []), X = -102.
-test(pack_int8) :- msgpack(-111, X, []), X = [0xd0, 0b10010001].
+test(unpack_int8) :- msgpack(X, [0xd0, 0b10011010], []), !, X = -102.
+test(pack_int8) :- msgpack(-111, X, []), !, X = [0xd0, 0b10010001].
 
 test(neg_int16) :- msgpack(-21555, [0xd1, 0xab, 0xcd], []).
-test(unpack_int16) :- msgpack(X, [0xd1, 0x12, 0x34], []), X = 4660.
-test(pack_int16) :- msgpack(-28673, X, []), X = [0xd1, 0x8f, 0xff].
+test(unpack_int16) :- msgpack(X, [0xd1, 0x12, 0x34], []), !, X = 4660.
+test(pack_int16) :- msgpack(-28673, X, []), !, X = [0xd1, 0x8f, 0xff].
 
 test(neg_int32) :- msgpack(-1884566017, [0xd2, 0x8f, 0xab, 0xcd, 0xff], []).
 test(unpack_int32) :- msgpack(X, [0xd2, 0x6a, 0x8b, 0x5f, 0x12], []),
-                      X = 0x6a8b5f12.
+                      !, X = 0x6a8b5f12.
 test(pack_int32) :- msgpack(-1884566017, X, []),
-                    X = [0xd2, 0x8f, 0xab, 0xcd, 0xff].
+                    !, X = [0xd2, 0x8f, 0xab, 0xcd, 0xff].
 
 test(neg_int64) :-
     msgpack(-8137253475156295520,
@@ -59,19 +60,19 @@ test(neg_int64) :-
             []).
 test(unpack_int64) :-
     msgpack(X, [0xd3, 0x8f, 0x12, 0xab, 0x13, 0xcd, 0xff, 0x00, 0xa0], []),
-    X = -8137253475156295520.
+    !, X = -8137253475156295520.
 test(unpack_int64_2) :-
     msgpack(X, [0xd3, 0x6f, 0x12, 0xab, 0x13, 0xcd, 0xff, 0x00, 0xa0], []),
-    X = 0x6f12_ab13_cdff_00a0.
+    !, X = 0x6f12_ab13_cdff_00a0.
 test(pack_int64) :-
     msgpack(-8137253475156295520, X, []),
-    X = [0xd3, 0x8f, 0x12, 0xab, 0x13, 0xcd, 0xff, 0x00, 0xa0].
+    !, X = [0xd3, 0x8f, 0x12, 0xab, 0x13, 0xcd, 0xff, 0x00, 0xa0].
 
 test(short_string) :- msgpack(str("ABC"), [0b10100011, 65, 66, 67], []).
 test(pack_short_string) :- msgpack(str("Foobar"), X, []),
-                           X = [166, 70, 111, 111, 98, 97, 114].
+                           !, X = [166, 70, 111, 111, 98, 97, 114].
 test(unpack_short_string) :- msgpack(X, [165, 104, 101, 108, 108, 111], []),
-                             X = str("hello").
+                             !, X = str("hello").
 
 test(short_list) :- msgpack(list([true, false, none]),
                                  [0b10010011, 0xc3, 0xc2, 0xc0], []).
@@ -89,9 +90,9 @@ test(unpack_short_list) :- msgpack(X, [0b10010011,
                                        0xcc, 0xfa, %uint8
                                        0xc0 % nil
                                       ], []),
-                           X = list([28, 0xfa, none]).
+                           !, X = list([28, 0xfa, none]).
 test(pack_short_list) :- msgpack(list([0xfff, true, false, none]), X, []),
-                         X = [0b10010100, 205, 15, 255, 0xc3, 0xc2, 0xc0].
+                         !, X = [0b10010100, 205, 15, 255, 0xc3, 0xc2, 0xc0].
 
 test(longer_list) :-
     msgpack(list([1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10]),
@@ -102,11 +103,11 @@ test(longer_list) :-
 test(unpack_longer_list) :-
     msgpack(X, [0xdc, 0x00, 20, 1,2,3,4,5,6,7,8,9,10, 1,2,3,4,5,6,7,8,9,10],
             []),
-    X = list([1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10]).
+    !, X = list([1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10]).
 test(pack_longer_list) :-
     msgpack(list([1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10]),
                  X, []),
-    X = [0xdc, 0x00, 20, 1,2,3,4,5,6,7,8,9,10, 1,2,3,4,5,6,7,8,9,10].
+    !, X = [0xdc, 0x00, 20, 1,2,3,4,5,6,7,8,9,10, 1,2,3,4,5,6,7,8,9,10].
 
 test(short_dict) :-
     msgpack(dict([str("foo")-1, str("bar")-str("quux")]),
@@ -124,12 +125,12 @@ test(unpack_short_dict) :-
              163, 98, 97, 114,
              164, 113, 117, 117, 120],
             []),
-    X = dict([str("foo")-1, str("bar")-str("quux")]).
+    !, X = dict([str("foo")-1, str("bar")-str("quux")]).
 test(pack_short_dict) :-
     msgpack(dict([str("foo")-1, str("bar")-str("quux")]),
             X,
             []),
-    X = [0b10000010,
+    !, X = [0b10000010,
          163,102,111,111,
          1,
          163, 98, 97, 114,
@@ -144,5 +145,13 @@ test(ext3) :- msgpack(ext(42, [0xab, 0xbc]), [0xc7, 2, 42, 0xab, 0xbc], []).
 test(timestamp) :- msgpack(date(2021, 1, 14, 9, 43, 16.0, 0, 'UTC', -),
                            [0xd6, 0xff, 0x60, 0x00, 0x12, 0x34],
                            []).
+test(timestamp64) :-
+    msgpack(date(2032, 11, 28, 4, 35, 28.720599889, 0, 'UTC', -),
+            [0xd7, 0xff, 0xab, 0xcd, 0xef, 0x98,   0x76, 0x54, 0x32, 0x10], []).
+
+test(float_single) :-
+    msgpack(single(0.15625),
+            [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000],
+            []).
 
 :- end_tests(msgpack).
