@@ -254,7 +254,7 @@ str(str(S)) -->
     { string(S), string_length(S, L), L > 31, L < 1<<32, !,
       str_header(L, H),
       int_bytes(L, LenBytes_),
-      pad_bytes(LenBytes_, LenBytes),
+      string_pad_bytes(LenBytes_, LenBytes),
       !,
       string_codes(S, Bytes),
       append(LenBytes, Bytes, Packed) },
