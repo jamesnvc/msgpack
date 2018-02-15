@@ -461,5 +461,5 @@ unsigned64_signed64(Un, Si) :-
     Un is 0xffff_ffff_ffff_ffff - Inv.
 unsigned64_signed64(Un, Un).
 
-:- use_module(library(plunit)).
-?- load_test_files([]), run_tests.
+% :- use_module(library(plunit)).
+% ?- load_test_files([]), run_tests.
