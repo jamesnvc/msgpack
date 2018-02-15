@@ -161,4 +161,20 @@ test(unpack_float_single) :-
     msgpack(X, [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000], []),
     !, X = single(0.15625).
 
+test(complex_unpack) :-
+    msgpack(Data,
+            [0b10000010,
+             163,102,111,111,
+             1,
+             163, 98, 97, 114,
+             0b10010100, 205, 15, 255, 0xc3, 0xc2, 0xc0],
+            []),
+    !, Data = dict([str("foo")-1, str("bar")-list([4095, true, false, none])]).
+
+test(complex_pack) :-
+    msgpack(list([-32, str("bloop"), list([65, 129, 2000])]),
+            Bytes, []),
+    !, Bytes = [0x93, 0xd0, 0xe0, 0xa5, 0x62, 0x6c, 0x6f, 0x6f, 0x70, 0x93,
+                0x41, 0xcc, 0x81, 0xcd, 0x7, 0xd0].
+
 :- end_tests(msgpack).
