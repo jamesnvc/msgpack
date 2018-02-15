@@ -143,21 +143,13 @@ int16(N) --> % pos int16
       N #= A<<8 + B }.
 % int32
 int32(N) -->
-    { integer(N), N >= -0x8000_0000, N =< -1, ! },
+    { integer(N), N >= -0x8000_0000, N < 0x8000_0000, ! },
     [0xd2, A, B, C, D],
-    { Inv is -(N + 1),
-      X is 0xffff_ffff - Inv,
+    { unsigned32_signed32(X, N),
       D is X /\ 0xff,
       C is (X /\ 0xff00) >> 8,
       B is (X /\ 0xff0000) >> 16,
       A is (X /\ 0xff000000) >> 24 }.
-int32(N) -->
-    { integer(N), N =< 0x8000_0000, N >= 0, ! },
-    [0xd2, A, B, C, D],
-    { D is N /\ 0xff,
-      C is (N /\ 0xff00) >> 8,
-      B is (N /\ 0xff0000) >> 16,
-      A is (N /\ 0xff000000) >> 24 }.
 int32(N) --> % neg int32
     { N in (-0x8000_0000)..(-1) },
     [0xd2, A, B, C, D],
@@ -173,10 +165,9 @@ int32(N) --> % pos int32
       N #= A<<24 + B<<16 + C<<8 + D }.
 % int64
 int64(N) -->
-    { integer(N), N >= -0x8000_0000_0000_0000, N =< -1, ! },
+    { integer(N), ! },
     [0xd3, A, B, C, D, E, F, G, H],
-    { Inv is -(N + 1),
-      X is 0xffff_ffff_ffff_ffff - Inv,
+    { unsigned64_signed64(X, N),
       H is X /\ 0xff,
       G is (X /\ 0xff00) >> 8,
       F is (X /\ 0xff0000) >> 16,
@@ -185,17 +176,6 @@ int64(N) -->
       C is (X /\ 0xff0000000000) >> 40,
       B is (X /\ 0xff000000000000) >> 48,
       A is (X /\ 0xff00000000000000) >> 56 }.
-int64(N) -->
-    { integer(N), N >= 0x8000_0000_0000_0000, N >= 0, ! },
-    [0xd3, A, B, C, D, E, F, G, H],
-    { H is N /\ 0xff,
-      G is (N /\ 0xff00) >> 8,
-      F is (N /\ 0xff0000) >> 16,
-      E is (N /\ 0xff000000) >> 24,
-      D is (N /\ 0xff00000000) >> 32,
-      C is (N /\ 0xff0000000000) >> 40,
-      B is (N /\ 0xff000000000000) >> 48,
-      A is (N /\ 0xff00000000000000) >> 56 }.
 int64(N) --> % neg int64
     { N in (-0x8000_0000_0000_0000)..(-1) },
     [0xd3, A, B, C, D, E, F, G, H],
@@ -457,11 +437,29 @@ int_bytes(I, Bs, R) :-
     In is I >> 8,
     int_bytes(In, [Bl|Bs], R).
 
+unsigned32_signed32(Un, Si) :-
+    integer(Un),
+    Un >= 0b1000_0000,
+    Inv is 0xffff_ffff - Un,
+    Si is -Inv - 1.
+unsigned32_signed32(Un, Si) :-
+    integer(Si),
+    Si < 0,
+    Inv is -Si - 1,
+    Un is 0xffff_ffff - Inv.
+unsigned32_signed32(Un, Un).
+
 unsigned64_signed64(Un, Si) :-
+    integer(Un),
     Un >= 0b1000_0000_0000_0000,
     Inv is 0xffff_ffff_ffff_ffff - Un,
     Si is -Inv - 1.
+unsigned64_signed64(Un, Si) :-
+    integer(Si),
+    Si < 0,
+    Inv is -Si - 1,
+    Un is 0xffff_ffff_ffff_ffff - Inv.
 unsigned64_signed64(Un, Un).
 
-% :- use_module(library(plunit)).
-% ?- load_test_files([]), run_tests.
+:- use_module(library(plunit)).
+?- load_test_files([]), run_tests.

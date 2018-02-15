@@ -2,6 +2,14 @@
 :- use_module(msgpack).
 :- begin_tests(msgpack).
 
+% helper tests
+test(unsign_sign_1) :-
+    msgpack:unsigned64_signed64(Un, -100), !,
+    Un = 18446744073709551516.
+test(unsign_sign_2) :-
+    msgpack:unsigned64_signed64(0xff00_abcd_0000_1111, Si),
+    !, Si = -71868697081278191.
+
 test(nil_val) :- msgpack(none, [0xc0], []).
 test(bool_false) :- msgpack(false, [0xc2], []).
 test(bool_true) :- msgpack(true, [0xc3], []).
