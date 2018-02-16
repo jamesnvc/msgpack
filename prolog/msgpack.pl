@@ -49,8 +49,7 @@ int(N) --> int64(N).
 % positive fixnum stores 7-bit positive integer
 fixnum(N) -->
     [N],
-    { N #=< 0b01111111,
-      N #>= 0, ! }.
+    { N =< 0b0111_1111, N >= 0, ! }.
 % negative fixnum stores 5-bit negative integer
 fixnum(N) -->
     [X],
