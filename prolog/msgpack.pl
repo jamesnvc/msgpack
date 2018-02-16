@@ -342,16 +342,35 @@ consume_msgpack_dict([K-V|KVs], Bs, N) :-
     Nn is N - 1,
     consume_msgpack_dict(KVs, Rst, Nn).
 
+dict_header(L, 0xde) :- L < 1<<16.
+dict_header(L, 0xdf) :- L < 1<<32.
+
 map(dict(D)) -->
     { is_list(D), length(D, L), L < 15, !,
       H is 0b10000000 + L,
       consume_msgpack_dict(D, T, L) },
     [H|T].
 map(dict(D)) -->
+    { is_list(D), length(D, Len), Len < 1<<32, !,
+      dict_header(Len, H),
+      int_bytes(Len, LenBytes_),
+      array_pad_bytes(LenBytes_, LenBytes),
+      consume_msgpack_dict(D, Packed, Len),
+      append(LenBytes, Packed, T) },
+    [H|T].
+map(dict(D)) -->
     [H|T],
     { H in 0b10000000..0b10001111,
       L is H /\ 0b0000_1111,
       consume_msgpack_dict(D, T, L) }.
+map(dict(D)) -->
+    [0xde, A, B],
+    { Len is A<<8 + B },
+    msgpack_dict(D, Len).
+map(dict(D)) -->
+    [0xdf, A, B, C, D],
+    { Len is A<<24 + B<<16 + C<<8 + D },
+    msgpack_dict(D, Len).
 
 msgpack_dict([], 0) --> [].
 msgpack_dict([K-V|Ds], N) -->
