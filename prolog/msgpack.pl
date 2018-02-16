@@ -310,20 +310,24 @@ array(list(List)) -->
       append(LenBytes, Packed, T) },
     [H|T].
 array(list(List)) -->
-    [H|T],
+    [H],
     { H in 0b1001_0000..0b1001_1111,
       L is H /\ 0b0000_1111,
       L in 0..15,
-      length(List, L),
-      consume_msgpack_list(List, T, L), ! }.
+      length(List, L) },
+    msgpack_list(List, L).
 array(list(List)) -->
-    [0xdc,A,B|T],
-    { Len is A <<8 + B,
-      consume_msgpack_list(List, T, Len) }.
+    [0xdc,A,B],
+    { Len is A <<8 + B },
+    msgpack_list(List, Len).
 array(list(List)) -->
-    [0xdd,A,B,C,D|T],
-    { Len is A <<24 + B<<16 + C<<8 + D,
-      consume_msgpack_list(List, T, Len) }.
+    [0xdd,A,B,C,D],
+    { Len is A <<24 + B<<16 + C<<8 + D },
+    msgpack_list(List, Len).
+
+msgpack_list([], 0) --> [].
+msgpack_list([A|As], N) -->
+    msgpack(A), { Nn is N - 1 }, msgpack_list(As, Nn).
 
 % Maps
 % Need to use pairs insead of dicts, because dicts only support atom
@@ -348,6 +352,12 @@ map(dict(D)) -->
     { H in 0b10000000..0b10001111,
       L is H /\ 0b0000_1111,
       consume_msgpack_dict(D, T, L) }.
+
+msgpack_dict([], 0) --> [].
+msgpack_dict([K-V|Ds], N) -->
+    msgpack(K), msgpack(V),
+    { Nn is N - 1 },
+    msgpack_dict(Ds, Nn).
 
 
 % Extension types
@@ -471,5 +481,5 @@ unsigned64_signed64(Un, Si) :-
     Un is 0xffff_ffff_ffff_ffff - Inv.
 unsigned64_signed64(Un, Un).
 
-% :- use_module(library(plunit)).
-% ?- load_test_files([]), run_tests.
+:- use_module(library(plunit)).
+?- load_test_files([]), run_tests.
