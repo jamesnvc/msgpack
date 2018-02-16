@@ -49,7 +49,7 @@ int(N) --> int64(N).
 % positive fixnum stores 7-bit positive integer
 fixnum(N) -->
     [N],
-    { N =< 0b0111_1111, N >= 0, ! }.
+    { N =< 0b0111 1111, N >= 0, ! }.
 % negative fixnum stores 5-bit negative integer
 fixnum(N) -->
     [X],
@@ -73,8 +73,7 @@ uint16(N) -->
 uint16(N) -->
     [0xcd, A, B],
     { N #> 0, N #< 1 << 17,
-      N #= A<<8 + B,
-      [A, B] ins 0..255 }.
+      N is A<<8 + B }.
 % uint32 stores a 32-bit big-endian unsigned integer
 uint32(N) -->
     % special-case for when given an integer; we can be much faster
@@ -88,9 +87,8 @@ uint32(N) -->
       A is (N /\ 0xff000000) >> 24 }.
 uint32(N) -->
     [0xce, A, B, C, D],
-    { [A,B,C,D] ins 0..255,
-      N #> 0, N #< 1 << 33,
-      N #= D + C << 8 + B << 16 + A << 24 }.
+    { N #> 0, N #< 1 << 33,
+      N is D + C << 8 + B << 16 + A << 24 }.
 % uint64 stores a 64-bit big-endian unsigned integer
 uint64(N) -->
     % special-case for when given an integer; we can be much faster
@@ -108,16 +106,15 @@ uint64(N) -->
       A is (N /\ 0xff00000000000000) >> 56 }.
 uint64(N) -->
     [0xcf, A, B, C, D, E, F, G, H],
-    { [A,B,C,D,E,F,G,H] ins 0..255,
-      N #> 0, N #< 1 << 65,
-      N #= H + G<<8 + F<<16 + E<<24 + D<<32 + C<<40 + B<<48 + A<<56 }.
+    { N #> 0, N #< 1 << 65,
+      N is H + G<<8 + F<<16 + E<<24 + D<<32 + C<<40 + B<<48 + A<<56 }.
 % int8 stores an 8-bit signed integer
 % argument bytes are always unsigned, so need to convert
 % NB. 0x80 = 0b1000 0000
 int8(N) --> % neg int8
-    { N in (-128)..(-1) },
     [0xd0, A],
-    { A in 0..255,
+    { N in (-128)..(-1),
+      A in 0..255,
       A #>= 0x80,
       Inv #= 0xff - A,
       N #= -Inv - 1 }.
@@ -125,21 +122,23 @@ int8(N) --> % pos int8
     [0xd0, N],
     { N in 0..127 }.
 % int16
-% TODO: add integer(N) case
-int16(N) --> % neg int16
-    { N in (-0x8000)..(-1) },
+int16(N) -->
+    { integer(N), N =< 0x7fff, N >= -0x8000 },
     [0xd1, A, B],
-    { [A,B] ins 0..255,
-      X #= A<<8 + B,
-      A #>= 0x80,
-      Inv #= 0xffff - X,
-      N #= -Inv - 1,
-      label([A,B]) }.
+    { unsigned16_signed16(X, N),
+      A is (X /\ 0xff00) >> 8,
+      B is (X /\ 0x00ff) }.
+int16(N) --> % neg int16
+    [0xd1, A, B],
+    { A #>= 0x80,
+      N in (-0x8000)..(-1),
+      X is A<<8 + B,
+      Inv is 0xffff - X,
+      N is -Inv - 1 }.
 int16(N) --> % pos int16
     [0xd1, A, B],
-    { [A,B] ins 0..255,
-      N in 0..0x7fff,
-      N #= A<<8 + B }.
+    { N in 0..0x7fff,
+      N is A<<8 + B }.
 % int32
 int32(N) -->
     { integer(N), N >= -0x8000_0000, N < 0x8000_0000, ! },
@@ -150,18 +149,16 @@ int32(N) -->
       B is (X /\ 0xff0000) >> 16,
       A is (X /\ 0xff000000) >> 24 }.
 int32(N) --> % neg int32
-    { N in (-0x8000_0000)..(-1) },
     [0xd2, A, B, C, D],
-    { [A,B,C,D] ins 0..255,
+    { N in (-0x8000_0000)..(-1),
       A #>= 0x80,
-      X #= A<<24 + B<<16 + C<<8 + D,
-      Inv #= 0xffff_ffff - X,
-      N #= -Inv - 1 }.
+      X is A<<24 + B<<16 + C<<8 + D,
+      Inv is 0xffff_ffff - X,
+      N is -Inv - 1 }.
 int32(N) --> % pos int32
     [0xd2, A, B, C, D],
-    { [A,B,C,D] ins 0..255,
-      N in 0..(0x7fff_ffff),
-      N #= A<<24 + B<<16 + C<<8 + D }.
+    { N in 0..(0x7fff_ffff),
+      N is A<<24 + B<<16 + C<<8 + D }.
 % int64
 int64(N) -->
     { integer(N), ! },
@@ -180,14 +177,14 @@ int64(N) --> % neg int64
     [0xd3, A, B, C, D, E, F, G, H],
     { [A,B,C,D,E,F,G,H] ins 0..255,
       A #>= 0x80,
-      X #= A<<56 + B<<48 + C<<40 + D<<32 + E<<24 + F<<16 + G<<8 + H,
-      Inv #= 0xffff_ffff_ffff_ffff - X,
-      N #= -Inv - 1 }.
+      X is A<<56 + B<<48 + C<<40 + D<<32 + E<<24 + F<<16 + G<<8 + H,
+      Inv is 0xffff_ffff_ffff_ffff - X,
+      N is -Inv - 1 }.
 int64(N) --> % pos int64
     [0xd3, A, B, C, D, E, F, G, H],
     { [A,B,C,D,E,F,G,H] ins 0..255,
       N in 0..(0x7fff_ffff_ffff_ffff),
-      N #= A<<56 + B<<48 + C<<40 + D<<32 + E<<24 + F<<16 + G<<8 + H }.
+      N is A<<56 + B<<48 + C<<40 + D<<32 + E<<24 + F<<16 + G<<8 + H }.
 
 % Floats
 % TODO: use clp(r) for this?
@@ -241,8 +238,8 @@ str(str(S)) -->
     [H|Packed].
 str(str(S)) -->
     [H|T],
-    { H in 0b10100000..0b10111111,
-      H #= 0b10100000 \/ L,
+    { H in 0b1010_0000..0b1011_1111,
+      L is H /\ 0b0001_1111,
       L in 0..31,
       prefix(Bytes, T),
       length(Bytes, L),
@@ -271,11 +268,11 @@ bin(bin(Data)) -->
     { length(Data, Len) }.
 bin(bin(Data)) -->
     [0xc5, A, B|Data],
-    { Len #= A<<8 + B,
+    { Len is A<<8 + B,
       length(Data, Len) }.
 bin(bin(Data)) -->
     [0xc6, A, B, C, D|Data],
-    { Len #= A<<24 + B<<16 + C<<8 + D,
+    { Len is A<<24 + B<<16 + C<<8 + D,
       length(Data, Len) }.
 
 % Arrays
@@ -314,9 +311,10 @@ array(list(List)) -->
     [H|T].
 array(list(List)) -->
     [H|T],
-    { H in 0b10010000..0b10011111,
-      H #= 0b10010000 + L,
+    { H in 0b1001_0000..0b1001_1111,
+      L is H /\ 0b0000_1111,
       L in 0..15,
+      length(List, L),
       consume_msgpack_list(List, T, L), ! }.
 array(list(List)) -->
     [0xdc,A,B|T],
@@ -348,43 +346,44 @@ map(dict(D)) -->
 map(dict(D)) -->
     [H|T],
     { H in 0b10000000..0b10001111,
-      H #= 0b10000000 + L,
+      L is H /\ 0b0000_1111,
       consume_msgpack_dict(D, T, L) }.
+
 
 % Extension types
 
 ext(ext(Type, [Data])) -->
-    { Type in 0..0x7f },
-    [0xd4, Type, Data].
+    [0xd4, Type, Data],
+    { Type in 0..0x7f }.
 ext(ext(Type, [A,B])) -->
-    { Type in 0..0x7f },
-    [0xd5, Type, A, B].
+    [0xd5, Type, A, B],
+    { Type in 0..0x7f }.
 ext(ext(Type, [A,B,C,D])) -->
-    { Type in 0..0x7f },
-    [0xd6, Type, A, B, C, D].
+    [0xd6, Type, A, B, C, D],
+    { Type in 0..0x7f }.
 ext(ext(Type, Data)) -->
-    { Type in 0..0x7f },
     [0xd7, Type|Data],
+    { Type in 0..0x7f },
     { length(Data, 8) }.
 ext(ext(Type, Data)) -->
-    { Type in 0..0x7f },
     [0xd8, Type|Data],
+    { Type in 0..0x7f },
     { length(Data, 16) }.
 ext(ext(Type, Data)) -->
-    { Type in 0..0x7f },
     [0xc7, Len, Type|Data],
+    { Type in 0..0x7f },
     { Len in 0..255,
       length(Data, Len) }.
 ext(ext(Type, Data)) -->
-    { Type in 0..0x7f },
     [0xc8, A, B, Type|Data],
+    { Type in 0..0x7f },
     { Len #< 1<<17,
       [A,B] ins 0..255,
       Len #= A<<8 + B,
       length(Data, Len) }.
 ext(ext(Type, Data)) -->
-    { Type in 0..0x7f },
     [0xc9, A, B, C, D, Type|Data],
+    { Type in 0..0x7f },
     { Len #< 1<<33,
       [A,B,C,D] ins 0..255,
       Len #= A<<24 + B<<16 + C<<8 + D,
@@ -403,7 +402,7 @@ timestamp(dt(Dt)) -->
       D is (Ts /\ 0x0000_00ff) >> 0 }.
 timestamp(dt(T)) -->
     [0xd6, 0xff, A, B, C, D],
-    { Ts #= A<<24 + B<<16 + C<<8 + D,
+    { Ts is A<<24 + B<<16 + C<<8 + D,
       stamp_date_time(Ts, T, 'UTC') }.
 % timestamp 64 stores the number of seconds and nanoseconds that have
 % elapsed since epoch; nanosecond in a 30-bit unsigned int and seconds
@@ -435,6 +434,18 @@ int_bytes(I, Bs, R) :-
     Bl is I /\ 0xff,
     In is I >> 8,
     int_bytes(In, [Bl|Bs], R).
+
+unsigned16_signed16(Un, Si) :-
+    integer(Un),
+    Un >= 0b1000,
+    Inv is 0xffff - Un,
+    Si is -Inv - 1.
+unsigned16_signed16(Un, Si) :-
+    integer(Si),
+    Si < 0,
+    Inv is -Si - 1,
+    Un is 0xffff - Inv.
+unsigned16_signed16(Un, Un).
 
 unsigned32_signed32(Un, Si) :-
     integer(Un),
