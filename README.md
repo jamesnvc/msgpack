@@ -4,6 +4,8 @@ This library provides a DCG, `msgpack//1` for the parsing of MessagePack.
 
 It can be used to either pack or unpack MessagePack data structures to/from bytes.
 
+It is [available from the SWI Prolog registry](http://www.swi-prolog.org/pack/list?p=msgpack) and can be installed via `?- pack_install(msgpack).`.
+
 ## Examples
 
 Unpacking:
