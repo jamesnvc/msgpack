@@ -466,7 +466,7 @@ int_bytes(I, Bs, R) :-
 
 unsigned16_signed16(Un, Si) :-
     integer(Un),
-    Un >= 0b1000,
+    Un >= 0x8000,
     Inv is 0xffff - Un,
     Si is -Inv - 1.
 unsigned16_signed16(Un, Si) :-
@@ -478,7 +478,7 @@ unsigned16_signed16(Un, Un).
 
 unsigned32_signed32(Un, Si) :-
     integer(Un),
-    Un >= 0b1000_0000,
+    Un >= 0x8000_0000,
     Inv is 0xffff_ffff - Un,
     Si is -Inv - 1.
 unsigned32_signed32(Un, Si) :-
@@ -490,7 +490,7 @@ unsigned32_signed32(Un, Un).
 
 unsigned64_signed64(Un, Si) :-
     integer(Un),
-    Un >= 0b1000_0000_0000_0000,
+    Un >= 0x8000_0000_0000_0000,
     Inv is 0xffff_ffff_ffff_ffff - Un,
     Si is -Inv - 1.
 unsigned64_signed64(Un, Si) :-
