@@ -82,6 +82,24 @@ test(pack_short_string) :- msgpack(str("Foobar"), X, []),
 test(unpack_short_string) :- msgpack(X, [165, 104, 101, 108, 108, 111], []),
                              !, X = str("hello").
 
+test(str8_upto_255) :-
+   findall( C, ( between(1, 255, _), C is random(94) ), Codes),
+   string_codes(S,Codes),
+   phrase(msgpack(str(S)), Bs),
+   assertion(Bs = [ 0xd9, 255 | Codes ]).
+
+test(str16_upto_65535) :-
+   findall( C, ( between(1, 65535, _), C is random(94) ), Codes),
+   string_codes(S,Codes),
+   phrase(msgpack(str(S)), Bs),
+   assertion(Bs = [ 0xda, 255, 255 | Codes ]).
+
+test(str32_upto_4294967295) :-
+   findall( C, ( between(1, 100_000, _), C is random(94) ), Codes),
+   string_codes(S,Codes),
+   phrase(msgpack(str(S)), Bs),
+   assertion(Bs = [ 0xdb, 0, 1, 134, 160 | Codes ]).
+
 test(short_list) :- msgpack(list([true, false, none]),
                                  [0b10010011, 0xc3, 0xc2, 0xc0], []).
 test(nested_short_list) :-
@@ -117,6 +135,22 @@ test(pack_longer_list) :-
                  X, []),
     !, X = [0xdc, 0x00, 20, 1,2,3,4,5,6,7,8,9,10, 1,2,3,4,5,6,7,8,9,10].
 
+test(pack_array_byte_range) :-
+   findall( C,  between(0, 127, C), Ls),
+   phrase(msgpack(list(Ls)), Bs),
+   assertion(Bs = [ 0xdc, 0x0, 0x80 | Ls ]),
+   findall( C,  between(128, 255, C), Ls1),
+   findall( [204,C],  between(128, 255, C), LsExpected0),
+   flatten(LsExpected0, LsExpected),
+   phrase(msgpack(list(Ls1)), Bs1),
+   assertion(Bs1 = [ 0xdc, 0x0, 0x80 | LsExpected ]).
+
+test(pack_array32_upto_4294967295) :-
+   findall( C, ( between(1, 111_333, _), C is random(128) ), Ls),
+   phrase(msgpack(list(Ls)), Bs),
+   assertion(Bs = [ 0xdd, 0, 0x1, 0xb2, 0xe5 | Ls ]).
+
+
 test(short_dict) :-
     msgpack(dict([str("foo")-1, str("bar")-str("quux")]),
             [0b10000010,
@@ -144,6 +178,15 @@ test(pack_short_dict) :-
          163, 98, 97, 114,
          164, 113, 117, 117, 120].
 
+test(map16_more_than_15_pairs_dict) :-
+   findall(str(K)-V, 
+           ( between(1,16,V), 
+             format(string(K), '~w',[V]) ),
+           KVs),
+   msgpack(dict(KVs), Bs, []),
+   msgpack(KVs1, Bs, []),
+   assertion(KVs1 == dict(KVs)).
+
 test(bin8) :- msgpack(bin([0xfa, 0xbc, 0x00]), [0xc4, 3, 0xfa, 0xbc, 0x00], []).
 
 test(ext1) :- msgpack(ext(28, [0xab]), [0xd4, 28, 0xab], []).
@@ -161,10 +204,7 @@ test(float_single) :-
     msgpack(single(0.15625),
             [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000],
             []).
-% currently failing b/c packing floats seems like a huge pain in the ass
-%% test(pack_float_single) :-
-%%     msgpack(single(0.15625), X, []),
-%%     !, X = [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000].
+
 test(unpack_float_single) :-
     msgpack(X, [0xca, 0b0011_1110, 0b0010_0000, 0b0000_0000, 0b00000000], []),
     !, X = single(0.15625).
@@ -213,4 +253,91 @@ test(big_test) :-
                str("~:mentioned-user-ids")-list([str("~#list"), list([])]),
                str("~:mentioned-tag-ids")-list([str("~#list"), list([])])]).
 
+test(speed_test) :-
+   Bs=[148, 1, 14, 192, 220, 0, 17, 131, 162, 105, 100, 2, 166, 115, 116, 114,
+       101, 97, 109, 166, 115, 116, 100, 101, 114, 114, 164, 109, 111, 100 , 101, 165,
+       98, 121, 116, 101, 115, 132, 162, 105, 100, 3, 166, 115, 116, 114, 101, 97,
+       109, 163, 106, 111, 98, 166, 99, 108, 105, 101, 110, 116, 133, 164, 110, 97,
+       109, 101, 179, 112, 121, 116, 104, 111, 110, 51, 45, 115, 99, 114, 105, 112,
+       116, 45, 104, 111, 115, 116, 167, 118, 101, 114, 115, 105, 111, 110, 132, 165,
+       109, 97, 106, 111, 114, 0, 165, 109, 105, 110, 111, 114, 3, 165, 112, 97, 116,
+       99, 104, 1, 170, 112, 114, 101, 114, 101, 108, 101, 97, 115, 101, 160, 164,
+       116, 121, 112, 101, 164, 104, 111, 115, 116, 167, 109, 101, 116, 104, 111, 100,
+       115, 131, 164, 112, 111, 108, 108, 128, 165, 115, 112, 101, 99, 115, 129, 165,
+       110, 97, 114, 103, 115, 1, 168, 115, 104, 117, 116, 100, 111, 119, 110, 128,
+       170, 97, 116, 116, 114, 105, 98, 117, 116, 101, 115, 130, 167, 108, 105, 99,
+       101, 110, 115, 101 , 169, 65, 112, 97, 99, 104, 101, 32, 118, 50, 167, 119,
+       101, 98, 115, 105, 116, 101, 191, 103, 105, 116, 104, 117, 98, 46, 99, 111,
+       109, 47, 110, 101, 111, 118, 105, 109, 47, 112, 121, 116, 104, 111, 110, 45,
+       99, 108, 105, 101, 110, 116, 164, 109, 111, 100, 101, 163, 114, 112, 99, 131,
+       162, 105, 100, 4, 166, 115, 116, 114 , 101, 97, 109, 163, 106, 111, 98, 164,
+       109, 111, 100, 101, 165, 98, 121, 116, 101, 115, 131, 162, 105, 100, 5, 166,
+       115, 116, 114, 101, 97, 109, 163, 106, 111, 98, 164, 109, 111, 100, 101, 165,
+       98, 121, 116, 101, 115, 132, 162, 105, 100, 6, 166, 115, 116, 114, 101, 97,
+       109, 166, 115, 111, 99, 107, 101, 116, 166, 99, 108, 105, 101, 110, 116, 128,
+       164, 109, 111, 100, 101, 163, 114, 112, 99, 131, 162, 105, 100, 7, 166, 115,
+       116, 114, 101, 97, 109, 163, 106, 111, 98, 164, 109, 111, 100, 101, 165, 98,
+       121, 116, 101, 115, 131, 162, 105, 100, 8, 166, 115, 116, 114, 101, 97, 109,
+       163, 106, 111, 98, 164, 109, 111, 100, 101, 165, 98, 121, 116, 101 , 115, 132,
+       162, 105, 100, 9, 166, 115, 116, 114, 101, 97, 109, 166, 115, 111, 99, 107,
+       101, 116, 166, 99, 108, 105, 101, 110, 116, 128, 164, 109, 111, 100, 101, 163,
+       114, 112, 99, 132, 162, 105, 100, 10, 166, 115, 116, 114, 101, 97, 109, 166,
+       115, 111, 99, 107, 101, 116, 166, 99, 108, 105, 101, 110, 116, 128, 164, 109,
+       111, 100, 101, 163, 114, 112, 99, 132, 162, 105, 100, 204, 192, 166, 115, 116,
+       114, 101, 97, 109, 166, 115, 111, 99, 107, 101, 116, 166, 99, 108, 105, 101,
+       110, 116, 128, 164, 109, 111, 100, 101, 163, 114, 112, 99, 132, 162, 105, 100,
+       204, 193, 166, 115, 116, 114, 101, 97, 109, 166, 115, 111, 99, 107, 101, 116,
+       166, 99, 108, 105, 101, 110, 116, 128, 164, 109, 111, 100, 101, 163, 114, 112,
+       99, 132, 162, 105, 100, 204, 194, 166, 115, 116, 114, 101, 97, 109, 166, 115,
+       111, 99, 107, 101, 116, 166, 99, 108, 105, 101, 110, 116, 128, 164, 109, 111,
+       100, 101, 163, 114, 112, 99, 132, 162, 105, 100, 204, 195, 166, 115, 116, 114,
+       101, 97, 109, 166 , 115, 111, 99, 107, 101, 116, 166, 99, 108, 105, 101, 110,
+       116, 128, 164, 109, 111, 100, 101, 163, 114, 112, 99, 132, 162, 105, 100, 204,
+       196, 166, 115, 116, 114, 101, 97, 109, 166, 115, 111, 99, 107, 101, 116, 166,
+       99, 108, 105, 101, 110, 116, 128, 164, 109, 111, 100, 101, 163, 114, 112, 99,
+       132, 162, 105, 100, 204, 197, 166, 115, 116, 114, 101, 97, 109, 166, 115, 111,
+       99, 107, 101, 116, 166, 99, 108, 105, 101, 110, 116, 128, 164, 109, 111, 100,
+       101, 163, 114, 112, 99, 132, 162, 105, 100, 204, 205, 166, 115, 116, 114, 101,
+       97, 109, 166, 115, 111, 99, 107, 101, 116, 166, 99, 108, 105, 101, 110, 116,
+       128, 164, 109, 111, 100, 101, 163, 114, 112, 99, 132, 162, 105, 100, 204, 206,
+       166, 115, 116, 114, 101, 97, 109, 166, 115, 111, 99, 107, 101, 116, 166, 99,
+       108, 105, 101, 110, 116, 128, 164, 109, 111, 100, 101, 163, 114, 112, 99],
+   get_time(T0),
+   phrase(msgpack(MPRes), Bs ),
+   get_time(T1),
+   MSec is (T1-T0)*1000,
+   print_message(informational, format("msgpack: Unpack speed test finished in ~3f ms.", [MSec])),
+   % Make sure unpacking this test takes less than 50ms, this may need to be
+   % changed if we are on a very slow cpu
+   assertion(MSec < 50),
+   MPExpected = list([1, 14, none, list([dict([str("id")-2,
+          str("stream")-str("stderr"), str("mode")-str("bytes")]),
+          dict([str("id")-3, str("stream")-str("job"),
+          str("client")-dict([str("name")-str("python3-script-host"),
+          str("version")-dict([str("major")-0, str("minor")-3, str("patch")-1,
+          str("prerelease")-str("")]), str("type")-str("host"),
+          str("methods")-dict([str("poll")-dict([]), str("specs")-dict([str("nargs")-1]),
+          str("shutdown")-dict([])]), str("attributes")-dict([str("license")-str("Apache v2"), 
+          str("website")-str("github.com/neovim/python-client")])]),
+          str("mode")-str("rpc")]), dict([str("id")-4, str("stream")-str("job"),
+          str("mode")-str("bytes")]), dict([str("id")-5, str("stream")-str("job"),
+          str("mode")-str("bytes")]), dict([str("id")-6, str("stream")-str("socket"),
+          str("client")-dict([]), str("mode")-str("rpc")]), dict([str("id")-7,
+          str("stream")-str("job"), str("mode")-str("bytes")]), dict([str("id")-8,
+          str("stream")-str("job"), str("mode")-str("bytes")]),
+          dict([str("id")-9, str("stream")-str("socket"), str("client")-dict([]),
+          str("mode")-str("rpc")]), dict([str("id")-10, str("stream")-str("socket"),
+          str("client")-dict([]), str("mode")-str("rpc")]), dict([str("id")-192,
+          str("stream")-str("socket"), str("client")-dict([]), str("mode")-str("rpc")]),
+          dict([str("id")-193, str("stream")-str("socket"), str("client")-dict([]),
+          str("mode")-str("rpc")]), dict([str("id")-194, str("stream")-str("socket"),
+          str("client")-dict([]), str("mode")-str("rpc")]), dict([str("id")-195,
+          str("stream")-str("socket"), str("client")-dict([]), str("mode")-str("rpc")]),
+          dict([str("id")-196, str("stream")-str("socket"), str("client")-dict([]),
+          str("mode")-str("rpc")]), dict([str("id")-197, str("stream")-str("socket"),
+          str("client")-dict([]), str("mode")-str("rpc")]), dict([str("id")-205,
+          str("stream")-str("socket"), str("client")-dict([]), str("mode")-str("rpc")]),
+          dict([str("id")-206, str("stream")-str("socket"), str("client")-dict([]),
+          str("mode")-str("rpc")])])]),
+   assertion(MPRes == MPExpected).
 :- end_tests(msgpack).

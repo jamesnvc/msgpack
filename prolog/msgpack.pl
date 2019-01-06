@@ -222,45 +222,48 @@ string_pad_bytes([B1, B2], [B1, B2]).
 string_pad_bytes([B1, B2, B3], [0, B1, B2, B3]).
 string_pad_bytes([B1, B2, B3, B4], [B1, B2, B3, B4]).
 
+msgpack_string_len(S, Len) -->
+    msgpack_string_len_(Len, Codes),
+    { string_codes(S, Codes) }.
+msgpack_string_len_(0, [],  L, L) :- !.
+msgpack_string_len_(Len, [C|Codes]) -->
+   [C],
+   { Len1 #= Len - 1 },
+   msgpack_string_len_(Len1, Codes).
+
 str(str(S)) -->
     { string(S), string_length(S, L), L =< 31, ! },
-    [H|Bytes],
+    [H],
     { H is 0b10100000 \/ L,
-      string_codes(S, Bytes) }.
+      string_codes(S, Bytes) },
+    Bytes.
 str(str(S)) -->
     { string(S), string_length(S, L), L > 31, L < 1<<32, !,
       str_header(L, H),
       int_bytes(L, LenBytes_),
       string_pad_bytes(LenBytes_, LenBytes),
       !,
-      string_codes(S, Bytes),
-      append(LenBytes, Bytes, Packed) },
-    [H|Packed].
+      string_codes(S, Bytes) },
+    [H],
+    LenBytes,
+    Bytes.
 str(str(S)) -->
-    [H|T],
+    [H],
     { H in 0b1010_0000..0b1011_1111,
       L is H /\ 0b0001_1111,
-      L in 0..31,
-      prefix(Bytes, T),
-      length(Bytes, L),
-      string_codes(S, Bytes) }.
+      L in 0..31 },
+    msgpack_string_len(S, L).
 str(str(S)) -->
-    [0xd9,L|T],
-    { prefix(Bytes, T),
-      length(Bytes, L),
-      string_codes(S, Bytes) }.
+    [0xd9,L],
+    msgpack_string_len(S, L).
 str(str(S)) -->
-    [0xda,A,B|T],
-    { prefix(Bytes, T),
-      length(Bytes, L),
-      L is A<<8 + B,
-      string_codes(S, Bytes) }.
+    [0xda,A,B],
+    { L is A<<8 + B },
+    msgpack_string_len(S, L).
 str(str(S)) -->
-    [0xdb,A,B,C,D|T],
-    { prefix(Bytes, T),
-      length(Bytes, L),
-      L is A<<24 + B<<16 + C<<8 + D,
-      string_codes(S, Bytes) }.
+    [0xdb,A,B,C,D],
+    { L is A<<24 + B<<16 + C<<8 + D },
+    msgpack_string_len(S, L).
 
 % Bins i.e. byte arrays
 bin(bin(Data)) -->
@@ -278,12 +281,6 @@ bin(bin(Data)) -->
 % Arrays
 
 % Array helper predicates
-consume_msgpack_list([], [], 0) :- !.
-consume_msgpack_list([A|As], Bs, N) :-
-    msgpack(A, Bs, Rst),
-    !,
-    Nn is N - 1,
-    consume_msgpack_list(As, Rst, Nn).
 
 array_header(L, 0xdc) :- L < 1<<16.
 array_header(L, 0xdd) :- L < 1<<32.
@@ -296,88 +293,77 @@ array_pad_bytes([A,B,C,D], [A,B,C,D]).
 array(list(List)) -->
     { is_list(List), length(List, Len), Len < 15,
       !,
-      H is 0b10010000 + Len,
-      consume_msgpack_list(List, T, Len) },
-    [H|T].
+      H is 0b10010000 + Len },
+    [H], msgpack_list_len(List, Len).
 array(list(List)) -->
     { is_list(List), length(List, Len), Len < 1<<32,
       !,
       array_header(Len, H),
       int_bytes(Len, LenBytes_),
-      array_pad_bytes(LenBytes_, LenBytes),
-      !,
-      consume_msgpack_list(List, Packed, Len),
-      append(LenBytes, Packed, T) },
-    [H|T].
+      array_pad_bytes(LenBytes_, LenBytes) },
+    [H],
+    LenBytes,
+    msgpack_list_len(List, Len).
 array(list(List)) -->
     [H],
     { H in 0b1001_0000..0b1001_1111,
       L is H /\ 0b0000_1111,
-      L in 0..15,
-      length(List, L) },
-    msgpack_list(List, L).
+      L in 0..15 },
+    msgpack_list_len(List, L).
 array(list(List)) -->
     [0xdc,A,B],
     { Len is A <<8 + B },
-    msgpack_list(List, Len).
+    msgpack_list_len(List, Len).
 array(list(List)) -->
     [0xdd,A,B,C,D],
     { Len is A <<24 + B<<16 + C<<8 + D },
-    msgpack_list(List, Len).
+    msgpack_list_len(List, Len).
 
-msgpack_list([], 0) --> [].
-msgpack_list([A|As], N) -->
-    msgpack(A), { Nn is N - 1 }, msgpack_list(As, Nn).
+msgpack_list_len([], 0, L, L) :- !.
+msgpack_list_len([A|As], N) -->
+    msgpack(A), { Nn is N - 1 }, msgpack_list_len(As, Nn).
 
 % Maps
 % Need to use pairs insead of dicts, because dicts only support atom
 % or integer keys
 
 % map helper predicates
-consume_msgpack_dict([], [], 0) :- !.
-consume_msgpack_dict([K-V|KVs], Bs, N) :-
-    msgpack(K, Bs, Rst_),
-    msgpack(V, Rst_, Rst),
-    !,
-    Nn is N - 1,
-    consume_msgpack_dict(KVs, Rst, Nn).
+msgpack_dict_len([], 0, L, L) :- !.
+msgpack_dict_len([K-V|KVs], N) -->
+    msgpack(K),
+    msgpack(V),
+    { Nn is N - 1 },
+    msgpack_dict_len(KVs, Nn).
 
 dict_header(L, 0xde) :- L < 1<<16.
 dict_header(L, 0xdf) :- L < 1<<32.
 
 map(dict(D)) -->
     { is_list(D), length(D, L), L < 15, !,
-      H is 0b10000000 + L,
-      consume_msgpack_dict(D, T, L) },
-    [H|T].
+      H is 0b10000000 + L },
+      [H],
+      msgpack_dict_len(D, L).
 map(dict(D)) -->
     { is_list(D), length(D, Len), Len < 1<<32, !,
       dict_header(Len, H),
       int_bytes(Len, LenBytes_),
-      array_pad_bytes(LenBytes_, LenBytes),
-      consume_msgpack_dict(D, Packed, Len),
-      append(LenBytes, Packed, T) },
-    [H|T].
+      array_pad_bytes(LenBytes_, LenBytes) },
+      [H],
+      LenBytes,
+      msgpack_dict_len(D, Len).
 map(dict(D)) -->
-    [H|T],
+    [H],
     { H in 0b10000000..0b10001111,
-      L is H /\ 0b0000_1111,
-      consume_msgpack_dict(D, T, L) }.
+      L is H /\ 0b0000_1111 },
+      msgpack_dict_len(D, L).
 map(dict(D)) -->
     [0xde, A, B],
     { Len is A<<8 + B },
-    msgpack_dict(D, Len).
+    msgpack_dict_len(D, Len).
 map(dict(D)) -->
     [0xdf, A, B, C, D],
     { Len is A<<24 + B<<16 + C<<8 + D },
-    msgpack_dict(D, Len).
-
-msgpack_dict([], 0) --> [].
-msgpack_dict([K-V|Ds], N) -->
-    msgpack(K), msgpack(V),
-    { Nn is N - 1 },
-    msgpack_dict(Ds, Nn).
-
+    msgpack_dict_len(D, Len).
 
 % Extension types
 
